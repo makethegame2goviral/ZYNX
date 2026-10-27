@@ -1,39 +1,43 @@
 <!doctype html>
 <html lang="de">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#05070f">
-  <title>ZYNX</title>
-  <link rel="stylesheet" href="./styles/main.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#05070f">
+<title>ZYNX</title>
+<link rel="stylesheet" href="./styles/main.css">
 </head>
 <body>
-  <div id="app">
-    <canvas id="game-canvas"></canvas>
-    <div id="loading" class="overlay"><div class="loading-card"><div class="zynx-logo">ZYNX</div><p>Initialisiere Roboterwelt …</p><div class="loader"></div></div></div>
-    <header id="hud" class="hidden">
-      <div class="hud-left">
-        <div class="stat money"><span>⚡</span><b id="money-value">0</b></div>
-        <div class="stat speed"><span>»</span><b id="speed-value">6.0</b></div>
-        <div class="stat zone"><span>◉</span><b id="zone-value">Safe Zone</b></div>
-      </div>
-      <div class="hud-center"><div id="event-banner" class="hidden"></div></div>
-      <div class="hud-right">
-        <div class="stat player"><span>◉</span><b id="player-name">Spieler</b></div>
-        <button id="inventory-button" class="icon-button">🎒</button>
-        <button id="settings-button" class="icon-button">⚙️</button>
-      </div>
-    </header>
-    <div id="interaction-hint" class="hidden"></div>
-    <div id="touch-controls" class="hidden">
-      <div id="joystick-zone"><div id="joystick-base"><div id="joystick-knob"></div></div></div>
-      <div class="touch-buttons"><button id="jump-button">SPRUNG</button><button id="interact-button">E</button></div>
-    </div>
-    <div id="inventory-panel" class="panel hidden"><div class="panel-header"><h2>Inventar</h2><button class="close-button" data-close="inventory-panel">✕</button></div><p class="panel-subtitle">10 Plätze · Eier sicher zur Basis bringen</p><div id="inventory-grid" class="inventory-grid"></div></div>
-    <div id="settings-panel" class="panel hidden"><div class="panel-header"><h2>Einstellungen</h2><button class="close-button" data-close="settings-panel">✕</button></div><label class="setting-row"><span>Sound</span><input id="sound-toggle" type="checkbox" checked></label><div class="connection-status" id="connection-status">Verbinde …</div></div>
-    <div id="toast-container"></div>
-  </div>
-  <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.169.0/build/three.module.js","@supabase/supabase-js":"https://esm.sh/@supabase/supabase-js@2"}}</script>
-  <script type="module" src="./src/main.js"></script>
+<div id="app">
+<canvas id="game-canvas"></canvas>
+<div id="auth-overlay" class="overlay">
+<div class="panel auth-panel">
+<div class="zynx-logo">ZYNX</div>
+<h2 id="auth-title">Anmelden</h2>
+<input id="auth-username" class="input hidden" placeholder="Spielernamen wählen">
+<input id="auth-email" class="input" type="email" placeholder="E-Mail">
+<input id="auth-password" class="input" type="password" placeholder="Passwort">
+<button id="auth-submit" class="primary-button">Anmelden</button>
+<button id="auth-mode" class="link-button">Neuen Account erstellen</button>
+<div id="auth-error" class="error-text"></div>
+</div>
+</div>
+<div id="loading" class="overlay hidden"><div class="loading-card"><div class="zynx-logo">ZYNX</div><p>Initialisiere Roboterwelt …</p><div class="loader"></div></div></div>
+<header id="hud" class="hidden">
+<div class="hud-left"><div class="stat money"><span>⚡</span><b id="money-value">0</b></div><div class="stat speed"><span>»</span><b id="speed-value">6.0</b></div><div class="stat zone"><span>◉</span><b id="zone-value">Safe Zone</b></div></div>
+<div class="hud-center"><div id="event-banner" class="hidden"></div></div>
+<div class="hud-right"><div class="stat player"><span>◉</span><b id="player-name">Spieler</b></div><button id="rooms-button" class="icon-button">🌐</button><button id="inventory-button" class="icon-button">🎒</button><button id="shop-button" class="icon-button">🛒</button><button id="admin-button" class="icon-button hidden">🛡️</button><button id="settings-button" class="icon-button">⚙️</button></div>
+</header>
+<div id="interaction-hint" class="hidden"></div>
+<div id="touch-controls" class="hidden"><div id="joystick-zone"><div id="joystick-base"><div id="joystick-knob"></div></div></div><div class="touch-buttons"><button id="jump-button">SPRUNG</button><button id="interact-button">E</button></div></div>
+<div id="rooms-panel" class="panel hidden"><div class="panel-header"><h2>Server</h2><button class="close-button" data-close="rooms-panel">✕</button></div><input id="room-name" class="input" placeholder="Raumname"><button id="create-room" class="primary-button">Raum erstellen</button><input id="join-code" class="input" placeholder="Join-Code"><button id="join-room" class="primary-button">Mit Code beitreten</button><div id="room-list" class="room-list"></div></div>
+<div id="inventory-panel" class="panel hidden"><div class="panel-header"><h2>Inventar</h2><button class="close-button" data-close="inventory-panel">✕</button></div><p class="panel-subtitle">10 Plätze · Eier sicher zur Basis bringen</p><div id="inventory-grid" class="inventory-grid"></div></div>
+<div id="shop-panel" class="panel hidden"><div class="panel-header"><h2>Fortschritt</h2><button class="close-button" data-close="shop-panel">✕</button></div><div class="progress-row"><span>Speed Shop</span><b id="speed-level">Level 0</b></div><button id="buy-speed" class="primary-button">Speed kaufen</button><div class="progress-row"><span>Training</span><b id="training-level">Level 0</b></div><button id="train-button" class="primary-button">Trainieren</button><div class="progress-row"><span>Rebirth</span><b id="rebirth-count">0</b></div><button id="rebirth-button" class="danger-button">Rebirth</button></div>
+<div id="admin-panel" class="panel hidden"><div class="panel-header"><h2>Admin</h2><button class="close-button" data-close="admin-panel">✕</button></div><input id="admin-user" class="input" placeholder="Spieler-ID"><input id="admin-amount" class="input" type="number" placeholder="Geldbetrag"><button id="give-money" class="primary-button">Geld geben</button><select id="admin-rarity" class="input"><option value="rare">Selten</option><option value="super_rare">Super Selten</option><option value="epic">Episch</option><option value="legendary">Legendär</option><option value="mythic">Mythisch</option><option value="secret">Secret</option><option value="og">OG</option></select><button id="spawn-egg" class="primary-button">Ei in Zone spawnen</button><button id="give-egg" class="primary-button">Ei geben</button><input id="admin-message" class="input" placeholder="Nachricht für alle"><button id="send-message" class="primary-button">Nachricht senden</button><button id="start-event" class="primary-button">Double Money starten</button><button id="ban-player" class="danger-button">Spieler bannen</button><button id="move-player" class="primary-button">In diesen Raum bringen</button></div>
+<div id="settings-panel" class="panel hidden"><div class="panel-header"><h2>Einstellungen</h2><button class="close-button" data-close="settings-panel">✕</button></div><label class="setting-row"><span>Sound</span><input id="sound-toggle" type="checkbox" checked></label><button id="logout-button" class="danger-button">Abmelden</button><div class="connection-status" id="connection-status">Verbunden.</div></div>
+<div id="toast-container"></div>
+</div>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.169.0/build/three.module.js","@supabase/supabase-js":"https://esm.sh/@supabase/supabase-js@2"}}</script>
+<script type="module" src="./src/main.js"></script>
 </body>
 </html>
