@@ -1,0 +1,1 @@
+export const SUPABASE_URL=window.ZYNX_SUPABASE_URL||'';export const SUPABASE_ANON_KEY=window.ZYNX_SUPABASE_ANON_KEY||'';export function isSupabaseConfigured(){return Boolean(SUPABASE_URL&&SUPABASE_ANON_KEY)}

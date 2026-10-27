@@ -1,0 +1,1 @@
+import{createClient}from'@supabase/supabase-js';import{SUPABASE_URL,SUPABASE_ANON_KEY,isSupabaseConfigured}from'./env.js';let client=null;export function getSupabase(){if(!isSupabaseConfigured())return null;if(!client)client=createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true}});return client}
