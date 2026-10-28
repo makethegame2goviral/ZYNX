@@ -1,0 +1,13 @@
+import * as THREE from 'three';
+import {getSupabase} from './supabase.js';
+import {RARITIES} from './config.js';
+export class ServerEggSystem{
+ constructor(scene){this.scene=scene;this.items=new Map();this.roomId=null;this.userId=null;this.ready=false;this.paused=false;this.loading=false;this.version=0;this.timer=0;this.offset=0;this.lastSync=0;this.geometry=new THREE.SphereGeometry(.4,16,12);this.geometry.scale(1,1.3,1);this.onSnapshot=()=>{};this.onError=()=>{};}
+ clear(){for(const item of this.items.values()){this.scene.remove(item.mesh);item.mesh.material.dispose();}this.items.clear();this.ready=false;}
+ async setRoom(roomId,userId){this.version++;this.clear();this.roomId=roomId;this.userId=userId;this.timer=0;await this.refresh();}
+ async refresh(){if(!this.roomId||this.paused||this.loading)return;this.loading=true;const version=this.version;try{const client=getSupabase();if(!client)throw Error('Keine Supabase-Verbindung');const {data,error}=await client.rpc('zynx_world_eggs',{p_room:this.roomId});if(error)throw error;if(version!==this.version)return;this.offset=Date.parse(data.serverTime)-Date.now();const seen=new Set();for(const record of data.eggs||[]){const zone=RARITIES.find(z=>z.id===record.zoneId&&z.enabled!==false);if(!zone)continue;seen.add(record.id);let item=this.items.get(record.id);if(!item){const rarity=RARITIES.find(z=>z.id===record.rarity)||zone;const mesh=new THREE.Mesh(this.geometry,new THREE.MeshStandardMaterial({color:rarity.color,emissive:rarity.color,emissiveIntensity:.35,metalness:.3,roughness:.3}));mesh.scale.setScalar(1+Math.max(0,RARITIES.indexOf(rarity))*.12);this.scene.add(mesh);item={mesh};this.items.set(record.id,item);}Object.assign(item,record);const slot=Number.isInteger(record.slot)?record.slot:0;item.mesh.position.set(-7+slot*4,.7,zone.position[2]+3);item.mesh.visible=record.state==='free';}
+ for(const [id,item] of this.items)if(!seen.has(id)){this.scene.remove(item.mesh);item.mesh.material.dispose();this.items.delete(id);}
+ this.lastSync=Date.now();this.ready=true;this.onSnapshot([...this.items.values()]);
+ }catch(e){if(version===this.version){this.ready=false;this.onError(e);}}finally{this.loading=false;}}
+ update(dt,player,onPickup){this.timer-=dt;if(this.timer<=0&&!document.hidden){this.timer=2;void this.refresh();}const now=Date.now()+this.offset;for(const item of this.items.values()){const free=item.state==='free'&&Date.parse(item.expiresAt)>now;item.mesh.visible=free;if(!free)continue;item.mesh.rotation.y+=dt;item.mesh.position.y=.7+Math.sin(now*.003+(item.slot||0))*.07;if(this.ready&&!this.paused&&Date.now()-this.lastSync<10000&&item.mesh.position.distanceTo(player.group.position)<1.5)onPickup(item);}}
+}
