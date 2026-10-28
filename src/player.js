@@ -1,8 +1,11 @@
 import * as THREE from 'three';
 import {GAME} from './config.js';
 import {activeInput} from './controls.js';
+import {StaticCollisionWorld} from './collisions.js';
+import {installTrainingProgress} from './training-ui.js';
 export class Player{
  constructor(scene){
+  this.collisions=new StaticCollisionWorld(scene);installTrainingProgress();
   this.velocity=new THREE.Vector3();this.speed=GAME.player.baseSpeed;this.trainingSpeedBonus=0;this.eventSpeedMultiplier=1;this.onGround=true;this.moveInput=new THREE.Vector2();this.jumpRequested=false;this.phase=0;
   this.group=new THREE.Group();this.group.position.set(0,0,8);scene.add(this.group);
   const material=color=>new THREE.MeshStandardMaterial({color,roughness:.65});
@@ -21,15 +24,14 @@ export class Player{
    const leg=new THREE.Group();leg.position.set(side*.19,.84,0);this.group.add(leg);box(leg,[.32,.63,.35],[0,-.3,0],pants);box(leg,[.35,.16,.5],[0,-.75,.06],shoe);this.legs.push(leg);
   }
  }
- get currentSpeed(){return Math.min(GAME.player.maxShopSpeed,this.speed+this.trainingSpeedBonus)*this.eventSpeedMultiplier;}
+ get currentSpeed(){const trainingCap=GAME.player.maxTrainingLevel*GAME.player.speedPerTrainingLevel;return (Math.min(GAME.player.maxShopSpeed,Math.max(0,this.speed))+Math.min(trainingCap,Math.max(0,this.trainingSpeedBonus)))*this.eventSpeedMultiplier;}
  update(dt,yaw){
   if(activeInput){this.moveInput.copy(activeInput.moveInput);this.jumpRequested=activeInput.jumpRequested;activeInput.jumpRequested=false;}
   const forward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
   const direction=forward.multiplyScalar(this.moveInput.y).addScaledVector(right,this.moveInput.x);if(direction.lengthSq()>1)direction.normalize();
   this.velocity.x=direction.x*this.currentSpeed;this.velocity.z=direction.z*this.currentSpeed;this.velocity.y+=GAME.gravity*dt;
   if(this.jumpRequested&&this.onGround){this.velocity.y=GAME.player.jumpVelocity;this.onGround=false;}this.jumpRequested=false;
-  this.group.position.addScaledVector(this.velocity,dt);const limit=GAME.worldSize/2-2;this.group.position.x=THREE.MathUtils.clamp(this.group.position.x,-limit,limit);this.group.position.z=THREE.MathUtils.clamp(this.group.position.z,-limit,limit);
-  if(this.group.position.y<=0){this.group.position.y=0;this.velocity.y=0;this.onGround=true;}
+  this.onGround=this.collisions.move(this.group.position,this.velocity,dt);
   const moving=direction.lengthSq()>.01;this.phase+=dt*10;
   if(moving){const angle=Math.atan2(direction.x,direction.z);this.group.rotation.y+=Math.atan2(Math.sin(angle-this.group.rotation.y),Math.cos(angle-this.group.rotation.y))*Math.min(1,dt*14);}
   for(let i=0;i<2;i++){const swing=moving&&this.onGround?Math.sin(this.phase+i*Math.PI)*.6:0;this.legs[i].rotation.x=swing;this.arms[i].rotation.x=-swing;}
