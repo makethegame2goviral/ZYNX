@@ -1,26 +1,181 @@
-import {getSupabase} from './supabase.js';
-import {GAME} from './config.js';
-import {mountEconomyUI} from './economy-ui.js';
-let functionUrl=window.ZYNX_API_URL||'',canonicalProfile=null,latest={},queue=Promise.resolve();
-const requests=new Map();
-export function setApiUrl(url){functionUrl=url.replace(/\/$/,'');}
-function enqueue(task){const result=queue.then(task);queue=result.catch(()=>{});return result;}
-function normalize(result){
- if(result.profile){if(!canonicalProfile)canonicalProfile={};Object.assign(canonicalProfile,result.profile);result.profile=canonicalProfile;}
- latest={...latest,...result};
- if(result.room)latest.roomId=result.room.id;
- const c=latest.config,p=canonicalProfile;
- if(c&&p){const bonus=Number(p.rebirth_count)*Number(c.rebirthSpeedPerLevel);GAME.player.baseSpeed=Number(c.baseSpeed)+bonus;GAME.player.maxShopLevel=Number(c.maxSpeedLevel);GAME.player.speedPerShopLevel=Number(c.speedPerLevel);GAME.player.speedPerTrainingLevel=Number(c.trainingSpeedPerLevel);GAME.player.maxShopSpeed=Number(c.baseSpeed)+Number(c.maxSpeedLevel)*Number(c.speedPerLevel)+bonus;GAME.shop.baseCost=Number(c.speedBaseCost);GAME.shop.costMultiplier=Number(c.speedCostGrowth);GAME.rebirth.moneyRequirement=Number(latest.rebirthCost);GAME.guardian.speeds=c.guardianSpeeds.map(Number);}
- requestAnimationFrame(()=>window.dispatchEvent(new Event('zynx-economy-updated')));return result;
+import { getSupabase } from './supabase.js';
+import { GAME } from './config.js';
+import { mountEconomyUI } from './economy-ui.js';
+
+let functionUrl = window.ZYNX_API_URL || '';
+let canonicalProfile = null;
+let latest = {};
+let queue = Promise.resolve();
+
+const requests = new Map();
+const BASE_ACTIONS = new Set([
+  'snapshot',
+  'place_egg',
+  'open_egg',
+  'take_egg',
+  'store_robot',
+  'place_robot',
+  'sell_robot'
+]);
+
+export function setApiUrl(url) {
+  functionUrl = url.replace(/\/$/, '');
 }
-async function economy(action,payload={}){return enqueue(async()=>{const client=getSupabase();if(!client)throw Error('Supabase fehlt');const key=action==='buy_speed'?action+':'+canonicalProfile?.speed_shop_level:action==='rebirth'?action+':'+canonicalProfile?.rebirth_count:action+':'+payload.eggId+':'+payload.slot;let requestId;if(action!=='snapshot'){if(!requests.has(key))requests.set(key,crypto.randomUUID());requestId=requests.get(key);}const {data,error}=await client.rpc('zynx_economy',{p_action:action,p_payload:{...payload,...(requestId?{requestId}:{})}});if(error)throw error;if(requestId)requests.delete(key);return normalize(data);});}
-async function call(action,payload={}){const client=getSupabase();if(!client||!functionUrl)throw Error('API ist nicht konfiguriert.');const {data}=await client.auth.getSession();const token=data.session?.access_token;if(!token)throw Error('Bitte anmelden.');const response=await fetch(functionUrl+'/zynx-api',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});const result=await response.json();if(!response.ok)throw Error(result.error||'Serverfehler');return normalize(result);}
-export const api={
- profile:()=>economy('snapshot'),
- createRoom:name=>call('room.create',{name}),joinRoom:code=>call('room.join',{code}),listRooms:()=>call('room.list'),
- spawnEgg:(roomId,zoneId,rarity)=>call('egg.spawn',{roomId,zoneId,rarity}),pickupEgg:async eggId=>{const {data,error}=await getSupabase().rpc('zynx_pickup_world_egg',{p_egg:eggId});if(error)throw error;return {egg:data};},secureEgg:eggId=>call('egg.secure',{eggId}),
- openEgg:()=>Promise.reject(Error('Bitte das Basis-Menü nutzen und einen freien Platz auswählen.')),
- buySpeed:()=>economy('buy_speed'),train:(points=1)=>enqueue(()=>call('training.tick',{points})),rebirth:()=>economy('rebirth'),placeEgg:(eggId,slot,roomId)=>economy('place_egg',{eggId,slot,roomId}),
- giveMoney:(userId,amount)=>call('admin.money',{userId,amount}),giveRobot:(userId,typeId)=>call('admin.robot',{userId,typeId}),giveEgg:(userId,rarity,roomId)=>call('admin.egg',{userId,rarity,roomId}),sendMessage:(text,roomId,duration=8)=>call('admin.message',{text,roomId,duration}),startEvent:(eventType,roomId,duration=600)=>call('admin.event',{eventType,roomId,duration}),banPlayer:(roomId,userId,reason='')=>call('admin.ban',{roomId,userId,reason}),movePlayer:(roomId,userId)=>call('admin.move',{roomId,userId})
+
+function enqueue(task) {
+  const result = queue.then(task);
+  queue = result.catch(() => {});
+  return result;
+}
+
+function normalize(result) {
+  if (result.profile) {
+    if (!canonicalProfile) canonicalProfile = {};
+    Object.assign(canonicalProfile, result.profile);
+    result.profile = canonicalProfile;
+  }
+
+  latest = { ...latest, ...result };
+
+  if (result.room) latest.roomId = result.room.id;
+
+  const config = latest.config;
+  const profile = canonicalProfile;
+
+  if (config && profile) {
+    const rebirthBonus = Number(profile.rebirth_count) * Number(config.rebirthSpeedPerLevel);
+
+    GAME.player.baseSpeed = Number(config.baseSpeed) + rebirthBonus;
+    GAME.player.maxShopLevel = Number(config.maxSpeedLevel);
+    GAME.player.speedPerShopLevel = Number(config.speedPerLevel);
+    GAME.player.speedPerTrainingLevel = Number(config.trainingSpeedPerLevel);
+    GAME.player.maxShopSpeed =
+      Number(config.baseSpeed) +
+      Number(config.maxSpeedLevel) * Number(config.speedPerLevel) +
+      rebirthBonus;
+
+    GAME.shop.baseCost = Number(config.speedBaseCost);
+    GAME.shop.costMultiplier = Number(config.speedCostGrowth);
+    GAME.rebirth.moneyRequirement = Number(latest.rebirthCost);
+    GAME.guardian.speeds = config.guardianSpeeds.map(Number);
+  }
+
+  requestAnimationFrame(() => {
+    window.dispatchEvent(new Event('zynx-economy-updated'));
+  });
+
+  return result;
+}
+
+async function economy(action, payload = {}) {
+  return enqueue(async () => {
+    const client = getSupabase();
+    if (!client) throw new Error('Supabase fehlt');
+
+    let requestId;
+
+    if (action !== 'snapshot') {
+      const key =
+        action === 'buy_speed'
+          ? `${action}:${canonicalProfile?.speed_shop_level}`
+          : action === 'rebirth'
+            ? `${action}:${canonicalProfile?.rebirth_count}`
+            : `${action}:${payload.eggId || payload.robotId || ''}:${payload.slot ?? ''}`;
+
+      if (!requests.has(key)) {
+        requests.set(key, crypto.randomUUID());
+      }
+
+      requestId = requests.get(key);
+    }
+
+    const rpcName = BASE_ACTIONS.has(action) ? 'zynx_base_action' : 'zynx_economy';
+
+    const { data, error } = await client.rpc(rpcName, {
+      p_action: action,
+      p_payload: {
+        ...payload,
+        ...(requestId ? { requestId } : {})
+      }
+    });
+
+    if (error) throw error;
+
+    if (requestId) requests.delete(key);
+
+    return normalize(data);
+  });
+}
+
+async function call(action, payload = {}) {
+  const client = getSupabase();
+
+  if (!client || !functionUrl) {
+    throw new Error('API ist nicht konfiguriert.');
+  }
+
+  const { data } = await client.auth.getSession();
+  const token = data.session?.access_token;
+
+  if (!token) throw new Error('Bitte anmelden.');
+
+  const response = await fetch(`${functionUrl}/zynx-api`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ action, ...payload })
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.error || 'Serverfehler');
+  }
+
+  return normalize(result);
+}
+
+export const api = {
+  profile: () => economy('snapshot'),
+
+  createRoom: name => call('room.create', { name }),
+  joinRoom: code => call('room.join', { code }),
+  listRooms: () => call('room.list'),
+
+  spawnEgg: (roomId, zoneId, rarity) => call('egg.spawn', { roomId, zoneId, rarity }),
+
+  pickupEgg: async eggId => {
+    const { data, error } = await getSupabase().rpc('zynx_pickup_world_egg', {
+      p_egg: eggId
+    });
+
+    if (error) throw error;
+    return { egg: data };
+  },
+
+  secureEgg: eggId => call('egg.secure', { eggId }),
+
+  placeEgg: (eggId, slot, roomId) => economy('place_egg', { eggId, slot, roomId }),
+  openEgg: eggId => economy('open_egg', { eggId }),
+  takeEgg: eggId => economy('take_egg', { eggId }),
+
+  storeRobot: robotId => economy('store_robot', { robotId }),
+  placeRobot: (robotId, slot, roomId) => economy('place_robot', { robotId, slot, roomId }),
+  sellRobot: robotId => economy('sell_robot', { robotId }),
+
+  buySpeed: () => economy('buy_speed'),
+  train: (points = 1) => enqueue(() => call('training.tick', { points })),
+  rebirth: () => economy('rebirth'),
+
+  giveMoney: (userId, amount) => call('admin.money', { userId, amount }),
+  giveRobot: (userId, typeId) => call('admin.robot', { userId, typeId }),
+  giveEgg: (userId, rarity, roomId) => call('admin.egg', { userId, rarity, roomId }),
+  sendMessage: (text, roomId, duration = 8) => call('admin.message', { text, roomId, duration }),
+  startEvent: (eventType, roomId, duration = 600) => call('admin.event', { eventType, roomId, duration }),
+  banPlayer: (roomId, userId, reason = '') => call('admin.ban', { roomId, userId, reason }),
+  movePlayer: (roomId, userId) => call('admin.move', { roomId, userId })
 };
-mountEconomyUI(api,()=>latest);
+
+mountEconomyUI(api, () => latest);
